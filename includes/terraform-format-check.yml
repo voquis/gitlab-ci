@@ -1,0 +1,11 @@
+# Terraform command to check terraform syntax.
+# Useful for cleaning up branch builds.
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-format-check.yml'
+
+.terraform-format-check:
+  script:
+    - terraform fmt -check -recursive -diff

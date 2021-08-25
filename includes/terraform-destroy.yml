@@ -1,0 +1,15 @@
+# Terraform command to remove all resources managed in state.
+# Useful for cleaning up branch builds.
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-destroy.yml'
+
+.terraform-destroy:
+  variables:
+    AWS_PROFILE: default
+    TERRAFORM_BACKEND_KEY: default
+  script:
+    - terraform init -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
+    - terraform apply -destroy -auto-approve

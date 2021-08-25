@@ -1,0 +1,16 @@
+# Terraform command to apply changes.
+# Optionally add targetted apply.
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-apply.yml'
+
+.terraform-apply:
+  variables:
+    AWS_PROFILE: default
+    TERRAFORM_BACKEND_KEY: default
+    TERRAFORM_TARGETS: ""
+  script:
+    - terraform init -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
+    - terraform apply -auto-approve ${TERRAFORM_TARGETS}

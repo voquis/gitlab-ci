@@ -8,7 +8,7 @@
 #   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/.tfenv.yml'
 
 
-.tfenv:
+.tfenv-install:
   image:
     name: ubuntu:20.04
   variables:
