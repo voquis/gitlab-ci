@@ -1,0 +1,17 @@
+# GitLab CI include to run AWS configuration
+# Creates a temporary aws credentials file,
+# Needed for profile-based terraform runs
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/.aws.yml'
+
+.aws:
+  before_script:
+    # Copy aws config
+    - cp -r .aws ~
+    # Create aws credentials file on disk
+    - printf "[gitlab]\naws_access_key_id=${AWS_ACCESS_KEY_ID}\naws_secret_access_key=${AWS_SECRET_ACCESS_KEY}" > ~/.aws/credentials
+    # unset AWS credentials
+    - unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY

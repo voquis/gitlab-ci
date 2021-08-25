@@ -1,0 +1,25 @@
+# Terraform environment manager for running
+# terraform jobs. Uses a .terraform-version
+# file to determine version to install
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/.tfenv.yml'
+
+
+.tfenv:
+  image:
+    name: ubuntu:20.04
+  variables:
+    TERRAFORM_FILES_PATH: .
+  before_script:
+    # Install tfenv
+    - apt-get update -y
+    - apt-get install -y curl git unzip
+    - git clone https://github.com/tfutils/tfenv.git ~/.tfenv
+    - ln -sf ~/.tfenv/bin/* /usr/local/bin
+    # Change to terraform files directory
+    - cd ${TERRAFORM_FILES_PATH}
+    # Install expected version of terraform using .terraform-version file
+    - tfenv install
