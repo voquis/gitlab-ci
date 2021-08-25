@@ -1,0 +1,16 @@
+# AWS S3 cli command to copy a local file to an S3 bucket
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/aws-s3-copy.yml'
+
+.aws-s3-copy:
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  variables:
+    S3_SOURCE_PATH: example.zip
+    S3_DEST_PATH: "s3://example/example.zip"
+  script:
+    - aws s3 cp ${S3_SOURCE_PATH} ${S3_DEST_PATH}

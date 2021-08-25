@@ -1,0 +1,28 @@
+# Commands to create a local zip archive of a python project
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/python-zip.yml'
+
+.python-zip:
+  image:
+    name: python:3-slim
+  variables:
+    PACKAGE_DIR: package
+    REQUIREMENTS_FILE: requirements.txt
+    ZIP_NAME: lambda.zip
+    HANDLER_FILE: app.py
+    MODULE_DIR: modules
+    BUILD_DIR: build
+  before_script:
+    - apt-get update -y
+    - apt-get install -y zip
+  script:
+    - touch ${REQUIREMENTS_FILE}
+    - pip install --target ${PACKAGE_DIR} -r ${REQUIREMENTS_FILE}
+    - cd ${PACKAGE_DIR}
+    - zip -r "../${BUILD_DIR}/${ZIP_NAME}" .
+    - cd ..
+    - zip -g "build/${ZIP_NAME}" ${HANDLER_FILE}
+    - zip -r "build/${ZIP_NAME}" ${MODULE_DIR}
