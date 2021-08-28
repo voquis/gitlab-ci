@@ -1,0 +1,19 @@
+# Kaniko is used to build and push Docker images to the GitLab registry
+# https://docs.gitlab.com/ee/ci/docker/using_kaniko.html#building-a-docker-image-with-kaniko
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/docker-build-push-gitlab.yml'
+
+.docker-build-push-gitlab:
+  image:
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  variables:
+    KANIKO_CONTEXT: .
+    KANIKO_TAG: latest
+  script:
+    - mkdir -p /kaniko/.docker
+    - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
+    - /kaniko/executor -c ${KANIKO_CONTEXT} -d $CI_REGISTRY_IMAGE:${KANIKO_TAG}
