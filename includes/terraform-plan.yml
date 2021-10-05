@@ -6,7 +6,7 @@
 # include:
 #   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-plan.yml'
 
-.terraform-apply:
+.terraform-plan:
   variables:
     AWS_PROFILE: default
     TERRAFORM_BACKEND_KEY: default
