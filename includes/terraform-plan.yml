@@ -1,0 +1,16 @@
+# Terraform command to plan changes.
+# Optionally add targetted plan.
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-plan.yml'
+
+.terraform-plan:
+  variables:
+    AWS_PROFILE: default
+    TERRAFORM_BACKEND_KEY: default
+    TERRAFORM_TARGETS: ""
+  script:
+    - terraform init -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
+    - terraform plan ${TERRAFORM_TARGETS}
