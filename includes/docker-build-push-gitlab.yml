@@ -13,7 +13,8 @@
   variables:
     KANIKO_CONTEXT: .
     KANIKO_TAG: latest
+    KANIKO_FLAGS: ""
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor -c ${KANIKO_CONTEXT} -d $CI_REGISTRY_IMAGE:${KANIKO_TAG}
+    - /kaniko/executor -c ${KANIKO_CONTEXT} -d $CI_REGISTRY_IMAGE:${KANIKO_TAG} ${KANIKO_FLAGS}
