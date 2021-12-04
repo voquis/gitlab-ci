@@ -17,4 +17,4 @@
   script:
     - mkdir -p /kaniko/.docker
     - echo "{\"auths\":{\"$CI_REGISTRY\":{\"username\":\"$CI_REGISTRY_USER\",\"password\":\"$CI_REGISTRY_PASSWORD\"}}}" > /kaniko/.docker/config.json
-    - /kaniko/executor -c ${KANIKO_CONTEXT} ${KANIKO_FLAGS} -d $CI_REGISTRY_IMAGE:${KANIKO_TAG}
+    - /kaniko/executor --context ${KANIKO_CONTEXT} ${KANIKO_FLAGS} --destination $CI_REGISTRY_IMAGE:${KANIKO_TAG}
