@@ -1,0 +1,16 @@
+# AWS S3 cli command to synchronise a local directory to an S3 bucket
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/aws-s3-sync.yml'
+
+.aws-s3-sync:
+  image:
+    name: amazon/aws-cli:latest
+    entrypoint: [""]
+  variables:
+    S3_SOURCE_PATH: ./example
+    S3_DEST_PATH: "s3://example/example/"
+  script:
+    - aws s3 sync ${S3_SOURCE_PATH} ${S3_DEST_PATH}
