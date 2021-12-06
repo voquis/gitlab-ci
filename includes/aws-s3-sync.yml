@@ -13,4 +13,4 @@
     S3_SOURCE_PATH: ./example
     S3_DEST_PATH: "s3://example/example/"
   script:
-    - aws s3 sync ${S3_SOURCE_PATH} ${S3_DEST_PATH}
+    - aws s3 sync "${S3_SOURCE_PATH}" "${S3_DEST_PATH}"
