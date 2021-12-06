@@ -13,4 +13,4 @@
     S3_SOURCE_PATH: example.zip
     S3_DEST_PATH: "s3://example/example.zip"
   script:
-    - aws s3 cp ${S3_SOURCE_PATH} ${S3_DEST_PATH}
+    - aws s3 cp "${S3_SOURCE_PATH}" "${S3_DEST_PATH}"
