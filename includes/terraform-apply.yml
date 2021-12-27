@@ -12,5 +12,8 @@
     TERRAFORM_BACKEND_KEY: default
     TERRAFORM_TARGETS: ""
   script:
+    - echo "Using AWS profile ${AWS_PROFILE}"
+    - echo "Using Terraform backend key ${TERRAFORM_BACKEND_KEY}"
+    - echo "Using optional targets ${TERRAFORM_TARGETS}"
     - terraform init -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
     - terraform apply -auto-approve ${TERRAFORM_TARGETS}
