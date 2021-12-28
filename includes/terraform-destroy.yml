@@ -13,5 +13,5 @@
   script:
     - echo "Using AWS profile ${AWS_PROFILE}"
     - echo "Using Terraform backend key ${TERRAFORM_BACKEND_KEY}"
-    - terraform init -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
+    - terraform init -upgrade -backend-config="profile=${AWS_PROFILE}" -backend-config="key=${TERRAFORM_BACKEND_KEY}"
     - terraform apply -destroy -auto-approve
