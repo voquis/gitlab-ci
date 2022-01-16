@@ -1,0 +1,419 @@
+# GitLab CI/CD Pipeline configuration
+
+# Variables available to all jobs
+variables:
+  TF_VAR_project: $VOQUIS_PROJECT_NAME
+  TF_VAR_domain: $VOQUIS_DOMAIN_NAME
+
+# Use include to access additional files
+# https://docs.gitlab.com/ee/ci/yaml/includes.html
+include:
+  # Reusable before_scripts
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/aws-credentials.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/tfenv-install.yml'
+  # Reusable scripts
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/aws-s3-copy.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/aws-s3-sync.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/docker-build-push-gitlab.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-format-check.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-plan.yml'
+  - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-apply.yml'
+  # GitLab templates
+  # https://docs.gitlab.com/ee/ci/yaml/workflow.html#workflowrules-templates
+  - template: 'Workflows/MergeRequest-Pipelines.gitlab-ci.yml'
+
+# Use !references to reuse config from remote includes
+# https://docs.gitlab.com/ee/ci/yaml/#reference-tags
+
+# Define stages
+stages:
+  - Validate
+  - Build Frontend
+  # Dev environment
+  - Pre-deploy Dev
+  - Publish Dev
+  - Deploy Dev
+  - Clean Dev
+  # Test environment
+  - Pre-deploy Test
+  - Publish Test
+  - Deploy Test
+  # Test environment
+  - Pre-deploy Prod
+  - Publish Prod
+  - Deploy Prod
+
+#------------------------------------------------------------------------------
+# Validate
+#------------------------------------------------------------------------------
+
+# Check terraform code
+Validate Terraform:
+  stage: Validate
+  variables:
+    TERRAFORM_FILES_PATH: ./terraform
+  image: !reference [.tfenv-install, image]
+  before_script:
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-format-check, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: never
+    - changes:
+      - terraform/**/*
+      when: always
+
+#------------------------------------------------------------------------------
+# Build
+#
+# Only builds on non-main branch builds
+#------------------------------------------------------------------------------
+
+# Build React app
+React build dev:
+  stage: Build Frontend
+  environment:
+    name: Dev
+  needs: []
+  variables:
+    REACT_APP_COMMIT: ${CI_COMMIT_SHORT_SHA}
+    BUILD_PATH: build/dev
+  image:
+    node:14
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/build/dev
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: never
+    - when: always
+
+React build test:
+  stage: Build Frontend
+  environment:
+    name: Test
+  needs: []
+  variables:
+    REACT_APP_COMMIT: ${CI_COMMIT_SHORT_SHA}
+    BUILD_PATH: build/test
+  image:
+    node:14
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/build/test
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: never
+    - when: always
+
+React build prod:
+  stage: Build Frontend
+  environment:
+    name: Prod
+  needs: []
+  variables:
+    REACT_APP_COMMIT: ${CI_COMMIT_SHORT_SHA}
+    BUILD_PATH: build/prod
+  image:
+    node:14
+  before_script:
+    - cd frontend
+    - npm install
+  script:
+    - npm run build
+  artifacts:
+    paths:
+      - frontend/build/prod
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: never
+    - when: always
+
+# Copy frontend to bucket in build account
+# This job copies build artifacts for all environments
+Frontend copy to build S3:
+  stage: Build Frontend
+  needs:
+    - React build dev
+    - React build test
+    - React build prod
+  image: !reference [.aws-s3-sync, image]
+  variables:
+    AWS_PROFILE: build
+    S3_SOURCE_PATH: frontend/build
+    S3_DEST_PATH: s3://${VOQUIS_PROJECT_NAME}-build-website-artifacts/frontend/${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+  script:
+    - !reference [.aws-s3-sync, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+      when: never
+    - when: always
+
+#------------------------------------------------------------------------------
+# Pre-deploy Dev
+# Provision infrastructure needed after build but before deploy
+# Uses Terraform targeted apply
+#------------------------------------------------------------------------------
+
+Terraform Pre-deploy Dev:
+  stage: Pre-deploy Dev
+  needs: []
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: dev
+    TERRAFORM_FILES_PATH: ./terraform/environments/dev
+    TERRAFORM_BACKEND_KEY: website-${CI_COMMIT_REF_SLUG}
+    TERRAFORM_TARGETS:
+      -target=module.website.module.s3_artifacts.aws_s3_bucket_public_access_block.this
+      -target=module.website.module.s3_artifacts.aws_s3_bucket.this
+    TF_VAR_branch: ${CI_COMMIT_REF_NAME}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+
+#------------------------------------------------------------------------------
+# Publish Dev
+#------------------------------------------------------------------------------
+
+# Run on feature branches
+Frontend Publish Dev:
+  stage: Publish Dev
+  image: !reference [.aws-s3-sync, image]
+  variables:
+    AWS_PROFILE: dev
+    S3_SOURCE_PATH: s3://${VOQUIS_PROJECT_NAME}-build-website-artifacts/frontend/${CI_COMMIT_SHORT_SHA}/dev
+    S3_DEST_PATH: s3://${VOQUIS_PROJECT_NAME}-dev-website-artifacts-${CI_COMMIT_REF_SLUG}/frontend/${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+  script:
+    - !reference [.aws-s3-sync, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+
+#------------------------------------------------------------------------------
+# Deploy Dev
+#------------------------------------------------------------------------------
+
+Terraform apply Dev:
+  stage: Deploy Dev
+  environment:
+    name: Dev
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: dev
+    TERRAFORM_FILES_PATH: ./terraform/environments/dev
+    TERRAFORM_BACKEND_KEY: website-${CI_COMMIT_REF_SLUG}
+    TF_VAR_branch: ${CI_COMMIT_REF_NAME}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: always
+
+
+#------------------------------------------------------------------------------
+# Clean Dev
+# Job to destroy resources for merged branches. Should only run after a
+# non-default branch has been merged into the default branch.
+# Git depth of 0 is required to fetch all branches
+# https://docs.gitlab.com/ee/ci/pipelines/settings.html#limit-the-number-of-changes-fetched-during-clone
+# The source branch is not available after merging since it's been deleted
+# by the time this job has started.
+# Uses custom python-based image to access git branches and execute terraform.
+# This step should run before deploying dev on main branch, otherwise shared
+# resources, e.g. bucket policy for cloudfront distributions, will be removed.
+#------------------------------------------------------------------------------
+
+Terraform destroy branch Dev:
+  stage: Clean Dev
+  image:
+    name: "voquis/terraform-destroy-git-branch-builds:latest"
+  variables:
+    GIT_DEPTH: "0"
+    GIT_STRATEGY: clone
+    AWS_PROFILE: "dev"
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+    TF_VAR_branch: ${CI_COMMIT_REF_NAME}
+    TF_BACKEND_S3_BUCKET: "${VOQUIS_PROJECT_NAME}-terraform-dev"
+    TF_RELATIVE_PATH: "terraform/environments/dev"
+    TF_KEY_EXCLUSIONS: "website-main"
+    TF_KEY_PREFIX: "website-"
+  before_script:
+    - !reference [.aws-credentials, before_script]
+  script:
+    - run_app
+  rules:
+    - if: '$CI_COMMIT_REF_NAME == $CI_DEFAULT_BRANCH'
+
+#------------------------------------------------------------------------------
+# Pre-deploy Test
+# Provision infrastructure needed after build but before deploy
+# Uses Terraform targeted apply
+#------------------------------------------------------------------------------
+
+Terraform Pre-deploy Test:
+  stage: Pre-deploy Test
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: test
+    TERRAFORM_FILES_PATH: ./terraform/environments/test
+    TERRAFORM_BACKEND_KEY: website-${CI_DEFAULT_BRANCH}
+    TERRAFORM_TARGETS:
+      -target=module.website.module.s3_artifacts.aws_s3_bucket_public_access_block.this
+      -target=module.website.module.s3_artifacts.aws_s3_bucket.this
+    TF_VAR_branch: ${CI_DEFAULT_BRANCH}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+#------------------------------------------------------------------------------
+# Publish Test
+#------------------------------------------------------------------------------
+
+Frontend Publish Test:
+  stage: Publish Test
+  image: !reference [.aws-s3-sync, image]
+  variables:
+    AWS_PROFILE: test
+    S3_SOURCE_PATH: s3://${VOQUIS_PROJECT_NAME}-build-website-artifacts/frontend/${CI_COMMIT_SHORT_SHA}/test
+    S3_DEST_PATH: s3://${VOQUIS_PROJECT_NAME}-test-website-artifacts-${CI_DEFAULT_BRANCH}/frontend/${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+  script:
+    - !reference [.aws-s3-sync, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+#------------------------------------------------------------------------------
+# Deploy Test
+#------------------------------------------------------------------------------
+
+Terraform apply Test:
+  stage: Deploy Test
+  environment:
+    name: Test
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: test
+    TERRAFORM_FILES_PATH: ./terraform/environments/test
+    TERRAFORM_BACKEND_KEY: website-${CI_DEFAULT_BRANCH}
+    TF_VAR_branch: ${CI_DEFAULT_BRANCH}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+#------------------------------------------------------------------------------
+# Pre-deploy Prod
+# Provision infrastructure needed after build but before deploy
+# Uses Terraform targeted apply
+#------------------------------------------------------------------------------
+
+Terraform Pre-deploy Prod:
+  stage: Pre-deploy Prod
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: prod
+    TERRAFORM_FILES_PATH: ./terraform/environments/prod
+    TERRAFORM_BACKEND_KEY: website-${CI_DEFAULT_BRANCH}
+    TERRAFORM_TARGETS:
+      -target=module.website.module.s3_artifacts.aws_s3_bucket_public_access_block.this
+      -target=module.website.module.s3_artifacts.aws_s3_bucket.this
+    TF_VAR_branch: ${CI_DEFAULT_BRANCH}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+#------------------------------------------------------------------------------
+# Publish Prod
+#------------------------------------------------------------------------------
+
+Frontend Publish Prod:
+  stage: Publish Prod
+  image: !reference [.aws-s3-sync, image]
+  variables:
+    AWS_PROFILE: prod
+    S3_SOURCE_PATH: s3://${VOQUIS_PROJECT_NAME}-build-website-artifacts/frontend/${CI_COMMIT_SHORT_SHA}/prod
+    S3_DEST_PATH: s3://${VOQUIS_PROJECT_NAME}-prod-website-artifacts-${CI_DEFAULT_BRANCH}/frontend/${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+  script:
+    - !reference [.aws-s3-sync, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+
+#------------------------------------------------------------------------------
+# Deploy Prod
+#------------------------------------------------------------------------------
+
+Terraform apply Prod:
+  stage: Deploy Prod
+  environment:
+    name: Prod
+  image: !reference [.tfenv-install, image]
+  variables:
+    AWS_PROFILE: prod
+    TERRAFORM_FILES_PATH: ./terraform/environments/prod
+    TERRAFORM_BACKEND_KEY: website-${CI_DEFAULT_BRANCH}
+    TF_VAR_branch: ${CI_DEFAULT_BRANCH}
+    TF_VAR_commit: ${CI_COMMIT_SHORT_SHA}
+  before_script:
+    - !reference [.aws-credentials, before_script]
+    - !reference [.tfenv-install, before_script]
+  script:
+    - !reference [.terraform-apply, script]
+  rules:
+    - if: $CI_COMMIT_TAG
+      when: manual
+      allow_failure: false

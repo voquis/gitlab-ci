@@ -1,2 +1,5 @@
-# gitlab-ci
-GitLab CI pipeline resources
+# GitLab CI resources
+
+Contains:
+- [Include](./includes) snippets
+- [Pipelines](./pipelines)
