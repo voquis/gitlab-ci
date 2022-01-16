@@ -264,7 +264,7 @@ Terraform apply Dev:
 Terraform destroy branch Dev:
   stage: Clean Dev
   image:
-    name: "voquis/terraform-destroy-git-branch-builds:latest"
+    name: "public.ecr.aws/voquis/terraform-destroy-git-branch-builds:latest"
   variables:
     GIT_DEPTH: "0"
     GIT_STRATEGY: clone
