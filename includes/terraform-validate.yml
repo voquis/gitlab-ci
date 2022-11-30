@@ -1,0 +1,21 @@
+# Terraform command to validate project in pipeline
+# Useful for validating terraform config.
+#
+# Usage:
+#
+# include:
+#   - remote: 'https://raw.githubusercontent.com/voquis/gitlab-ci/main/includes/terraform-validate.yml'
+# TERRAFORM_CHILD_PATHS should be a space-seperated list of strings
+# 
+.terraform-validate:
+  variables:
+    TERRAFORM_CHILD_PATHS: "."
+  script:
+    - |
+      # this reads the terraform path into an array 
+      read -a arr <<< "$TERRAFORM_CHILD_PATHS" 
+
+      for d in "${arr[@]}"
+      do
+          ( cd "$d" && terraform init -backend=false && terraform validate && cd - )
+      done
